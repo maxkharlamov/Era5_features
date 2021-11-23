@@ -15,32 +15,40 @@ from tqdm import tqdm
 from multiprocessing import Pool
 import multiprocessing as mp
 
+def xarray_to_df(nc):
+    
+    xarray_list = []
+    for i in tqdm(range(len(nc['longitude'][:])), desc = 'make list'):
+        for j in range(len(nc['latitude'][:])):
+            df_pre = nc[:, j, i].to_dataframe()
+            xarray_list.append(df_pre)
+            
+    return xarray_list
 
 def sd_stat(df_cut):
 # =============================================================================
 #     Функция для расчета характеристик снежного покрова
-#     Для отладки можно воспользоваться первой заглушкой
+#     
 # =============================================================================
     #df_cut = df_new[df_new['year'] == 2000]
     
     df_cut = df_cut.drop(['year'], axis = 1)
     df_stat = pd.DataFrame()
     
-    #year = df_cut['year'].unique()
-    
     df_snow = df_cut[df_cut['sd'] > 0]
     df_stat['snow_days'] = [len(df_snow)]
     
     try:
         df_stat['len_snow_period'] = [df_snow.index[-1] - df_snow.index[0]]
-        df_stat['len_snow_period'] = df_stat['len_snow_period'].dt.days + 1   # чтобы было норм
+        df_stat['len_snow_period'] = df_stat['len_snow_period'].dt.days + 1
         df_stat['len_snowbreak'] = df_stat['len_snow_period'] - df_stat['snow_days']
     except:
         df_stat['len_snow_period'] = [0]
         df_stat['len_snowbreak'] = [np.nan]
-    # =============================================================================
+        
+    # =========================================================================
     #   оттепели
-    # =============================================================================
+    # =========================================================================
     # подготовка данных
     df_ind = pd.DataFrame()
     df_ind['snowdepth'] = df_snow.index
@@ -48,7 +56,7 @@ def sd_stat(df_cut):
     aaa = pd.DataFrame()    # датафрейм со сдвинутыми датами
     aaa['snowdepth_sh'] = df_snow['sd'].shift(1).dropna().index
     
-    df_ind = pd.concat([df_ind, aaa], axis = 1) # соединяем
+    df_ind = pd.concat([df_ind, aaa], axis = 1) 
     
     df_ind['dif'] = df_ind['snowdepth_sh'] - df_ind['snowdepth']
     df_ind['dif'] = df_ind['dif'].dt.days - 1
@@ -79,10 +87,8 @@ def sd_stat(df_cut):
         df_stat['mean_snowdepth_snow_period'] = [np.nan]
         df_stat['Cv_snowdepth_snow_period'] = [np.nan]
     
-    
     df_stat['Cv_snowdepth_snow_days'] = df_snow['sd'].std() / df_snow['sd'].mean()
-
-    #df_stat.index = year
+    
     return df_stat
     
 def sd_stat_groupby(df_pre):
@@ -93,7 +99,6 @@ def sd_stat_groupby(df_pre):
 # =============================================================================
     df_new = df_pre.copy()
     df_new['year'] = df_new.index.year
-    #df_new.loc[df_new.index.month < 8, 'year'] -= 1    # зима 1979-1980 записывается как 1979      - устарело!
     df_new.loc[df_new.index.month >= 8, 'year'] += 1    # зима 1979-1980 записывается как 1980
      
     df_gr = df_new.groupby(df_new['year']).apply(sd_stat)
@@ -107,44 +112,32 @@ def sd_stat_groupby(df_pre):
     
     return df_gr
 
+
+
 if __name__ == '__main__':
 # =============================================================================
 #     Определение характеристик снежного покрова по данным ERA5
 #     Необходимо задать исходный файл с параметром snow_depth и место сохранения результата
 # =============================================================================
-    path = 'I:/RNF/data_ready_to_use/ERA5/snow_depth/'
+    path = 'input/'
     input_file = 'snow_depth_full.nc'                               # !!!
-    save_path = 'SD_full.nc'                                        # !!!
+    
+    save_path = 'output/SD_features.nc'                                        # !!!
     
     nc_sd = xr.open_dataset(path + input_file)        
-    nc_sd = nc_sd['sd'] * 1000 #.sel(latitude = slice(70, 43), longitude = slice(20, 60))
+    nc_sd = nc_sd['sd'] * 1000
+    #nc_sd = nc_sd.sel(latitude = slice(70, 43), longitude = slice(20, 60))
+    
     nc_sd.values = xr.where(nc_sd.values > 0.05, nc_sd.values,  0.0)
     
-    xarray_list = []
+    xarray_list = xarray_to_df(nc_sd)
     
-    for i in tqdm(range(len(nc_sd ['longitude'][:])), desc = 'make list'):
-        for j in range(len(nc_sd ['latitude'][:])):
-            
-            df_pre = nc_sd[:, j, i].to_dataframe()
-           
-            xarray_list.append(df_pre)
-
     with mp.Pool(mp.cpu_count()) as p:
 
         result = list(tqdm(p.imap(sd_stat_groupby, xarray_list[:], chunksize = 1), desc = 'imap', total = len(xarray_list)))
         
         p.close()
         p.join()
-    
-# если хотим юзать starmap, то надо будет поправить sd_stat_groupby
-# =============================================================================
-#     with mp.Pool(mp.cpu_count()) as p:
-#         
-#         aaa = p.starmap(sd_stat_groupby_new2, tqdm(product(xarray_list[:], funcs),
-#                    desc = 'strmap', total = len(xarray_list) * len(funcs)))
-#         p.close()
-#         p.join()
-# =============================================================================
 
     df_full = pd.concat(result)       
     

@@ -22,14 +22,12 @@ import warnings
 def sd_stat(df_cut):
 # =============================================================================
 #     Функция для расчета характеристик снежного покрова
-#     Для отладки можно воспользоваться первой заглушкой
+#     
 # =============================================================================
     #df_cut = df_new[df_new['year'] == 2000]
     
     df_cut = df_cut.drop(['year'], axis = 1)
     df_stat = pd.DataFrame()
-    
-    #year = df_cut['year'].unique()
     
     df_snow = df_cut[df_cut['sd'] > 0]
     df_stat['snow_days'] = [len(df_snow)]
@@ -85,7 +83,7 @@ def sd_stat(df_cut):
     
     df_stat['Cv_snowdepth_snow_days'] = df_snow['sd'].std() / df_snow['sd'].mean()
 
-    #df_stat.index = year
+
     return df_stat
 
 def temp_prec_stat(df_cut):
@@ -146,9 +144,6 @@ def temp_prec_stat(df_cut):
     
     #Все обработки исключений здесь из-за пропусков. в частности для Cv это деление на 0, т.к. среднее значение пустого слайса = 0. такая же херь для max()
     
-    #np.seterr(divide='ignore', invalid='ignore')
-    #warnings.filterwarnings("ignore", category=FutureWarning)
-    
     #df_cut = df_new[df_new['year'] == 2000]
     
     df_cut = df_cut.rename(columns = {'t2m':'mean_temp', 'tp':'prec', 'sd' : 'snowdepth'})
@@ -199,7 +194,7 @@ def temp_prec_stat(df_cut):
     df_ind['dif'] = df_ind['mean_temp_sh'] - df_ind['mean_temp']
     df_ind['dif'] = df_ind['dif'].dt.days - 1
     df_ind = df_ind[df_ind['dif'] > 0]
-    # добавил рассчет средней температуры за оттепель и суммы осадков за оттепель
+    # рассчет средней температуры за оттепель и суммы осадков за оттепель
     df_ind['thaw_temp_mean_per_thaw'] = [df_cut[df_ind['mean_temp'].iloc[i]:df_ind['mean_temp_sh'].iloc[i]]['mean_temp'].values[1:-1].mean() for i in range(len(df_ind))]
     df_ind['ThawTP_sum_per_thaw'] = [df_cut[df_ind['mean_temp'].iloc[i]:df_ind['mean_temp_sh'].iloc[i]]['prec'].values[1:-1].sum() for i in range(len(df_ind))]
     
@@ -212,14 +207,9 @@ def temp_prec_stat(df_cut):
     df_stat['thaw_mean_len'] = df_stat['thaw_days'] / df_stat['thaw_count']
     df_stat['thaw_max_len'] = [df_ind['dif'].max()] 
     
-    df_stat['thaw_temp_mean_per_thaw'] = df_ind['thaw_temp_mean_per_thaw'].mean()       # добавил
-    df_stat['ThawTP_sum_per_thaw'] = df_ind['ThawTP_sum_per_thaw'].mean()             # добавил
-    '''
-    try:
-        df_stat['thaw_max_len'] = [df_ind['dif'].max()] 
-    except:
-        df_stat['thaw_max_len'] = [np.nan] 
-    '''
+    df_stat['thaw_temp_mean_per_thaw'] = df_ind['thaw_temp_mean_per_thaw'].mean()       
+    df_stat['ThawTP_sum_per_thaw'] = df_ind['ThawTP_sum_per_thaw'].mean()      
+
     ################################### Cv part
     if  len(df_winter) != 0:
     
@@ -231,20 +221,20 @@ def temp_prec_stat(df_cut):
         df_stat['SnowTP_Cv'] = [df_winter[df_winter['mean_temp'] < 0]['prec'].std() / df_winter[df_winter['mean_temp'] < 0]['prec'].mean()]
         df_stat['ThawTP_Cv'] = [df_winter[df_winter['mean_temp'] > 0]['prec'].std() / df_winter[df_winter['mean_temp'] > 0]['prec'].mean()]
     else:
-        df_stat['thaw_days_Cv'] = np.nan        # добавил, но не уверен
-        df_stat['winter_temp_Cv'] = np.nan
-        df_stat['subzero_temp_Cv'] = np.nan
-        df_stat['thaw_temp_Cv'] = np.nan
+        df_stat['thaw_days_Cv'] = [np.nan]   
+        df_stat['winter_temp_Cv'] = [np.nan]
+        df_stat['subzero_temp_Cv'] = [np.nan]
+        df_stat['thaw_temp_Cv'] = [np.nan]
         
-        df_stat['SnowTP_Cv'] = np.nan
-        df_stat['ThawTP_Cv'] = np.nan
+        df_stat['SnowTP_Cv'] = [np.nan]
+        df_stat['ThawTP_Cv'] = [np.nan]
         
     ################################### TP part
     
     df_stat['SnowTP'] = [df_winter[df_winter['mean_temp'] < 0]['prec'].sum()]
     df_stat['ThawTP'] = [df_winter[df_winter['mean_temp'] > 0]['prec'].sum()]
     
-     ################################### last days stat
+    ################################### last days stat
     
     df_stat = last_day_stats(df_cut, max_i, max_i + pd.to_timedelta('10 days'), 'sp_10d')
     df_stat = last_day_stats(df_cut, max_i - pd.to_timedelta('10 days'), max_i + pd.to_timedelta('10 days'), 'bf_10d')
@@ -317,13 +307,7 @@ def temp_prec_stat(df_cut):
     df_stat = last_day_stats(df_cut, max_sd_ind, max_i, 'Smax_T0')     # температуры от Smax до T0 (до конца зимы) passive_melt
     df_stat = last_day_stats(df_cut, max_i, max_i_sd, 'T0_S0')     # температуры от S0 до T0 (до конца зимы) active_melt
     
-    #обнуление если пропуски
-    '''
-    len_ex = len(df_cut[df_cut.index.month.isin([11,12,1,2,3])]['mean_temp'].dropna())
-    if len_ex/151 < 0.9:            # 151 - это количество дней в 11,12,1,2,3 месяцах
-        df_stat = df_stat * np.nan
-    '''    
-    #df_stat.index = year
+    
     return df_stat
     
 def sd_stat_groupby(df_pre):
@@ -334,7 +318,6 @@ def sd_stat_groupby(df_pre):
 # =============================================================================
     df_new = df_pre.copy()
     df_new['year'] = df_new.index.year
-    #df_new.loc[df_new.index.month < 8, 'year'] -= 1            # зима 1979-1980 записывается как 1979      - устарело!
     df_new.loc[df_new.index.month >= 8, 'year'] += 1            # зима 1979-1980 записывается как 1980
      
     df_gr = df_new.groupby(df_new['year']).apply(temp_prec_stat)
@@ -354,9 +337,6 @@ if __name__ == '__main__':
 #     Необходимо задать исходные файлы с данными prec и temp и место сохранения результата
 # =============================================================================
 
-    
-    #aaa = df_stat[['melt_time', 'melt_time_%', 'melt_speed', 'melt_trend_coef', 'melt_active_trend_coef', 'melt_time_active', 'melt_time_active_%', 'melt_speed_active']]
-    
     path1 = 'F:/RNF/data_ready_to_use/ERA5/2m_temperature/'                    # !!!
     path2 = 'F:/RNF/data_ready_to_use/ERA5/total_precipitation/'
     path3 = 'F:/RNF/data_ready_to_use/ERA5/snow_depth/'
@@ -368,13 +348,14 @@ if __name__ == '__main__':
     save_path = 'Temp_Prec_SD_full4.nc'                                        # !!!
     
     nc_temp = xr.open_dataset(path1 + input_file1)        
-    nc_temp = nc_temp['t2m'] - 273.15 #.sel(latitude = slice(70, 43), longitude = slice(20, 60))
+    nc_temp = nc_temp['t2m'] - 273.15
     
     nc_pre = xr.open_dataset(path2 + input_file2)        
-    nc_pre = nc_pre['tp']*1000 #.sel(latitude = slice(70, 43), longitude = slice(20, 60))
-
+    nc_pre = nc_pre['tp']*1000
+    
     nc_sd = xr.open_dataset(path3 + input_file3)        
-    nc_sd = nc_sd['sd'] * 1000 #.sel(latitude = slice(70, 43), longitude = slice(20, 60))
+    nc_sd = nc_sd['sd'] * 1000
+    
     nc_sd.values = xr.where(nc_sd.values > 0.05, nc_sd.values,  0.0)
     
     xarray_list = []
@@ -388,10 +369,7 @@ if __name__ == '__main__':
             
             xarray_list.append(df_pre)
             
-    '''        
-    for x in  tqdm(xarray_list):
-        aaa = sd_stat_groupby(x)
-    ''' 
+    
     with mp.Pool(mp.cpu_count()) as p:
  
         result = list(tqdm(p.imap(sd_stat_groupby, xarray_list[:], chunksize = 1), desc = 'imap', total = len(xarray_list)))

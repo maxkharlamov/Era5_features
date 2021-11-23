@@ -16,82 +16,9 @@ from multiprocessing import Pool
 import multiprocessing as mp
 
 
-def sd_stat(df_cut):
-# =============================================================================
-#     Функция для расчета характеристик снежного покрова
-#     Для отладки можно воспользоваться первой заглушкой
-# =============================================================================
-    #df_cut = df_new[df_new['year'] == 2000]
-    
-    df_cut = df_cut.drop(['year'], axis = 1)
-    df_stat = pd.DataFrame()
-    
-    #year = df_cut['year'].unique()
-    
-    df_snow = df_cut[df_cut['sd'] > 0]
-    df_stat['snow_days'] = [len(df_snow)]
-    
-    try:
-        df_stat['len_snow_period'] = [df_snow.index[-1] - df_snow.index[0]]
-        df_stat['len_snow_period'] = df_stat['len_snow_period'].dt.days + 1   # чтобы было норм
-        df_stat['len_snowbreak'] = df_stat['len_snow_period'] - df_stat['snow_days']
-    except:
-        df_stat['len_snow_period'] = [0]
-        df_stat['len_snowbreak'] = [np.nan]
-    # =============================================================================
-    #   оттепели
-    # =============================================================================
-    # подготовка данных
-    df_ind = pd.DataFrame()
-    df_ind['snowdepth'] = df_snow.index
-    
-    aaa = pd.DataFrame()    # датафрейм со сдвинутыми датами
-    aaa['snowdepth_sh'] = df_snow['sd'].shift(1).dropna().index
-    
-    df_ind = pd.concat([df_ind, aaa], axis = 1) # соединяем
-    
-    df_ind['dif'] = df_ind['snowdepth_sh'] - df_ind['snowdepth']
-    df_ind['dif'] = df_ind['dif'].dt.days - 1
-    df_ind = df_ind[df_ind['dif'] > 0]
-    ###############################################################################
-    
-    df_stat['snowbreak_count'] = len(df_ind)
-    df_stat['snowbreak_max_len'] = df_ind['dif'].max()
-    df_stat['snowbreak_mean_len'] = df_ind['dif'].mean()
-    df_stat['len_snowbreak'] = df_ind['dif'].sum()         # повторение
-    
-    if len(df_ind) == 0:
-        df_stat['snowbreak_max_len'] = [0]
-        df_stat['snowbreak_mean_len'] = [0]
-        df_stat['len_snowbreak'] = [0]
-    
-    df_stat['Cv_snowbreak'] = df_ind['dif'].std() / df_ind['dif'].mean()
-    
-    df_stat['max_snowdepth'] = df_snow['sd'].max()
-    df_stat['10D_max_snowdepth'] = df_cut['sd'].rolling('10D').mean().max()
-    df_stat['mean_snowdepth_snow_days'] = df_snow['sd'].mean()
-    df_stat['sum_snowdepth'] = df_snow['sd'].sum()
-    
-    try:
-        df_stat['mean_snowdepth_snow_period'] = df_cut[df_snow.index[0] : df_snow.index[-1]]['sd'].mean()
-        df_stat['Cv_snowdepth_snow_period'] = df_cut[df_snow.index[0] : df_snow.index[-1]]['sd'].std() / df_cut[df_snow.index[0] : df_snow.index[-1]]['sd'].mean()
-    except:
-        df_stat['mean_snowdepth_snow_period'] = [np.nan]
-        df_stat['Cv_snowdepth_snow_period'] = [np.nan]
-    
-    
-    df_stat['Cv_snowdepth_snow_days'] = df_snow['sd'].std() / df_snow['sd'].mean()
-
-    #df_stat.index = year
-    return df_stat
-
 def temp_prec_stat(df_cut):
     def last_day_stats(df_cut, backward_days, forward_days, label):
-        '''
-        df_stat = pd.DataFrame()
-        last_nday_data = df_cut[max_i - pd.to_timedelta('5 days'):max_i] # last 5 days stat  new!
-        df_stat['temp_mean_last_5d'] = [last_nday_data['mean_temp'].mean()]
-        '''
+        
         last_nday_data = df_cut[max_i - pd.to_timedelta(str(backward_days) + ' days'):max_i + pd.to_timedelta(str(forward_days) + ' days')]
         
         df_stat['temp_mean_' + label] = [last_nday_data['mean_temp'].mean()]
@@ -107,7 +34,8 @@ def temp_prec_stat(df_cut):
         df_stat['temp_std_' + label] = [last_nday_data['mean_temp'].std()]
         return df_stat
     
-    #Все обработки исключений здесь из-за пропусков. в частности для Cv это деление на 0, т.к. среднее значение пустого слайса = 0. такая же херь для max()
+    
+    #Все обработки исключений здесь из-за пропусков. в частности для Cv это деление на 0, т.к. среднее значение пустого слайса = 0. это справедливо и для max()
 
     #df_cut = df_new[df_new['year'] == 2000]
     
@@ -132,7 +60,7 @@ def temp_prec_stat(df_cut):
     
     uzp = df_winter[['mean_temp', 'prec']].copy()          
     uzp['mean_temp'] = np.where(uzp['mean_temp'].values < 0, 1, np.nan)
-    uzp = uzp['mean_temp'].rolling(5).mean()        # 5 - окно
+    uzp = uzp['mean_temp'].rolling(5).mean()        
     min_i_uzp = uzp.first_valid_index() # дата начала
     max_i_uzp = uzp.last_valid_index() # дата конца
     
@@ -191,13 +119,13 @@ def temp_prec_stat(df_cut):
         df_stat['SnowTP_Cv'] = [df_winter[df_winter['mean_temp'] < 0]['prec'].std() / df_winter[df_winter['mean_temp'] < 0]['prec'].mean()]
         df_stat['ThawTP_Cv'] = [df_winter[df_winter['mean_temp'] > 0]['prec'].std() / df_winter[df_winter['mean_temp'] > 0]['prec'].mean()]
     else:
-        df_stat['thaw_days_Cv'] = np.nan        # добавил, но не уверен
-        df_stat['winter_temp_Cv'] = np.nan
-        df_stat['subzero_temp_Cv'] = np.nan
-        df_stat['thaw_temp_Cv'] = np.nan
+        df_stat['thaw_days_Cv'] = [np.nan]        
+        df_stat['winter_temp_Cv'] = [np.nan]
+        df_stat['subzero_temp_Cv'] = [np.nan]
+        df_stat['thaw_temp_Cv'] = [np.nan]
         
-        df_stat['SnowTP_Cv'] = np.nan
-        df_stat['ThawTP_Cv'] = np.nan
+        df_stat['SnowTP_Cv'] = [np.nan]
+        df_stat['ThawTP_Cv'] = [np.nan]
         
     ################################### TP part
     
@@ -240,14 +168,12 @@ def temp_prec_stat(df_cut):
 
     '''    
     
-    
     #обнуление если пропуски
     len_ex = len(df_cut[df_cut.index.month.isin([11,12,1,2,3])]['mean_temp'].dropna())
         
     if len_ex/151 < 0.9:            # 151 - это количество дней в 11,12,1,2,3 месяцах
         df_stat = df_stat * np.nan
         
-    #df_stat.index = year
     return df_stat
     
 def sd_stat_groupby(df_pre):
@@ -258,7 +184,6 @@ def sd_stat_groupby(df_pre):
 # =============================================================================
     df_new = df_pre.copy()
     df_new['year'] = df_new.index.year
-    #df_new.loc[df_new.index.month < 8, 'year'] -= 1            # зима 1979-1980 записывается как 1979      - устарело!
     df_new.loc[df_new.index.month >= 8, 'year'] += 1            # зима 1979-1980 записывается как 1980
      
     df_gr = df_new.groupby(df_new['year']).apply(temp_prec_stat)
@@ -288,15 +213,16 @@ if __name__ == '__main__':
     save_path = 'Temp_Prec_full.nc'                                        # !!!
     
     nc_temp = xr.open_dataset(path1 + input_file1)        
-    nc_temp = nc_temp['t2m'] - 273.15 #.sel(latitude = slice(70, 43), longitude = slice(20, 60))
+    nc_temp = nc_temp['t2m'] - 273.15 
     
     nc_pre = xr.open_dataset(path2 + input_file2)        
-    nc_pre = nc_pre['tp']*1000 #.sel(latitude = slice(70, 43), longitude = slice(20, 60))
+    nc_pre = nc_pre['tp']*1000 
+    
     
     xarray_list = []
      
-    for i in tqdm(range(len(nc_temp ['longitude'][232:])), desc = 'make list'):
-        for j in range(len(nc_temp ['latitude'][60:61])):
+    for i in tqdm(range(len(nc_temp ['longitude'][:])), desc = 'make list'):
+        for j in range(len(nc_temp ['latitude'][:])):
              
             df_pre = nc_temp[:, j, i].to_dataframe()
             df_pre = pd.concat([df_pre, nc_pre[:, j, i].to_dataframe()['tp']], axis = 1)
@@ -304,14 +230,13 @@ if __name__ == '__main__':
             xarray_list.append(df_pre)
             
 
-    ''' 
     with mp.Pool(mp.cpu_count()) as p:
  
         result = list(tqdm(p.imap(sd_stat_groupby, xarray_list[:], chunksize = 1), desc = 'imap', total = len(xarray_list)))
          
         p.close()
         p.join()
-    '''
+    
  
     df_full = pd.concat(result)       
      
