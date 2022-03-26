@@ -26,7 +26,6 @@ def fr_depth_stat(df_cut):
     df_cut = df_cut.drop(['year'], axis = 1)
     df_stat = pd.DataFrame()
     
-    #year = df_cut['year'].unique()
     df_frdepth = df_cut[df_cut['fr_depth'] > 0]
     df_stat['fr_depth_days'] = [len(df_frdepth)]
     df_stat['fr_depth_max'] = [df_frdepth['fr_depth'].max()]
@@ -48,7 +47,7 @@ def sd_stat_groupby(df_pre):
 # =============================================================================
     df_new = df_pre.copy()
     df_new['year'] = df_new.index.year
-    df_new.loc[df_new.index.month >= 8, 'year'] += 1    # зима 1979-1980 записывается как 1980
+    df_new.loc[df_new.index.month >= 8, 'year'] += 1    
      
     df_gr = df_new.groupby(df_new['year']).apply(fr_depth_stat)
                
@@ -63,7 +62,7 @@ def sd_stat_groupby(df_pre):
 
 def make_list(list_ij):
     nc_sd = xr.open_dataset('D:/RNF/data_ready_to_use/ERA5/' + 'fr_depth_EU_full.nc' )        
-    nc_sd = nc_sd['fr_depth'][:, list_ij[0], list_ij[1]].to_dataframe() #.sel(latitude = slice(70, 43), longitude = slice(20, 60))
+    nc_sd = nc_sd['fr_depth'][:, list_ij[0], list_ij[1]].to_dataframe() 
     return nc_sd
 
 
@@ -73,11 +72,11 @@ if __name__ == '__main__':
 #     Необходимо задать исходный файл с параметром snow_depth и место сохранения результата
 # =============================================================================
     path = 'D:/RNF/data_ready_to_use/ERA5/'
-    input_file = 'fr_depth_EU_full.nc'                               # !!!
-    save_path = 'output/fr_depth_stat_full.nc'                                        # !!!
+    input_file = 'fr_depth_EU_full.nc'                               
+    save_path = 'output/fr_depth_stat_full.nc'                                        
     
     nc_sd = xr.open_dataset(path + input_file)        
-    nc_sd = nc_sd['fr_depth'] #.sel(latitude = slice(70, 43), longitude = slice(20, 60))
+    nc_sd = nc_sd['fr_depth'] 
     
     
     xarray_list_mp = []
@@ -101,6 +100,6 @@ if __name__ == '__main__':
     df_full = pd.concat(result)       
     
     xxx = df_full.to_xarray()
-    xxx.to_netcdf(save_path)         # !!!
+    xxx.to_netcdf(save_path)         
        
 

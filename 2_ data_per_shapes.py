@@ -19,11 +19,10 @@ import matplotlib.pyplot as plt
 def sel_mon(month):
     return (month >= 3) & (month <= 5)
 
-def clip_by_shape(xr_file, shape):           #return nc mask
+def clip_by_shape(xr_file, shape):           
     ddd = xr_file[list(xr_file.variables)[3]].copy()
     ddd = ddd.mean(dim = 'time')
     
-    # перевод netcdf в geodataframe
     df = ddd.to_dataframe()
     df = df.reset_index()
     geom=gpd.points_from_xy(df['longitude'], df['latitude'])
@@ -42,7 +41,6 @@ def clip_by_shape(xr_file, shape):           #return nc mask
     
     gdf = gdf.set_index(['latitude', 'longitude'])
     nc_mask = gdf.to_xarray()
-    #xr_masked = xr_file * nc_mask['within']
     
     return nc_mask['within']
 
@@ -56,10 +54,7 @@ def zonalmean_xr(xr_dataset_mask, shape):
         df[v] = xr_dataset_mask[v].mean(dim = ['latitude', 'longitude']).to_pandas()
     return df
 
-# =============================================================================
-# datasets
-# =============================================================================
-#print('reading datasets...')
+
 plt.ioff()
 directory_to_save_graphs = 'reanalysis_output/clip_by_shape/level1/graphs/'
 directory_to_save = 'reanalysis_output/clip_by_shape/level1/'
@@ -67,16 +62,8 @@ directory_to_save = 'reanalysis_output/clip_by_shape/level1/'
 SD = xr.open_dataset('reanalysis_output/level1_ERA5/SD_full.nc')
 temp_prec = xr.open_dataset('reanalysis_output/level1_ERA5/Temp_Prec_SD_full4.nc')
 fr_depth = xr.open_dataset('reanalysis_output/level1_ERA5/fr_depth_stat_full.nc')
-SM = xr.open_dataset('reanalysis_output/level1_ERA5/SM_stat_full2.nc')      # SM_stat_full2 - без ошибок
+SM = xr.open_dataset('reanalysis_output/level1_ERA5/SM_stat_full2.nc')
 
-#SM_lin = xr.open_dataset('reanalysis_output/level1_ERA5/SM/SM_lin_full.nc')
-#SM_type = xr.open_dataset('reanalysis_output/level1_ERA5/SM/SM_type_full.nc')
-
-
-# =============================================================================
-# shapes
-# =============================================================================
-#print('reading shapes...')
 errors = []
 folders = os.listdir('shapes/shapes_etr/')
 for folder in folders:
@@ -86,10 +73,6 @@ for folder in folders:
     shapes = os.listdir(shapes_path)
     shapes = [x for x in shapes if x.endswith('.shp')]
     
-    # =============================================================================
-    # zonal_mean
-    # =============================================================================
-    #print('zonal mean...')
     shape = gpd.read_file(shapes_path + os.sep + shapes[0])
     for station in tqdm(shapes[:], desc = 'zonal mean...'):
         try:
@@ -98,7 +81,6 @@ for folder in folders:
             
             mask = clip_by_shape(SD, shape)
             
-            #zonal_mean
             SD_df = zonalmean_xr(SD*mask, shape = shape)
             temp_prec_df = zonalmean_xr(temp_prec*mask, shape = shape)
             fr_depth_df = zonalmean_xr(fr_depth*mask, shape = shape)

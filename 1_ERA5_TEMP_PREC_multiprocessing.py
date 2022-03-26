@@ -35,10 +35,6 @@ def temp_prec_stat(df_cut):
         return df_stat
     
     
-    #Все обработки исключений здесь из-за пропусков. в частности для Cv это деление на 0, т.к. среднее значение пустого слайса = 0. это справедливо и для max()
-
-    #df_cut = df_new[df_new['year'] == 2000]
-    
     df_cut = df_cut.rename(columns = {'t2m':'mean_temp', 'tp':'prec', 'sd' : 'snowdepth'})
     df_stat = pd.DataFrame()
     
@@ -56,59 +52,46 @@ def temp_prec_stat(df_cut):
     df_stat['thaw_temp_sum'] = [df_winter[df_winter['mean_temp'] > 0]['mean_temp'].sum()]
     df_stat['thaw_temp_mean'] = [df_winter[df_winter['mean_temp'] > 0]['mean_temp'].mean()]
     
-    #####################################  uzp устойчивый зимний период 
-    
     uzp = df_winter[['mean_temp', 'prec']].copy()          
     uzp['mean_temp'] = np.where(uzp['mean_temp'].values < 0, 1, np.nan)
     uzp = uzp['mean_temp'].rolling(5).mean()        
-    min_i_uzp = uzp.first_valid_index() # дата начала
-    max_i_uzp = uzp.last_valid_index() # дата конца
+    min_i_uzp = uzp.first_valid_index() 
+    max_i_uzp = uzp.last_valid_index() 
     
-    df_uzp = df_winter[min_i_uzp:]  # обрезаем с начала узп по последний минимум. [min_i_uzp:max_i_uzp] - если нужно по устойчивый период
+    df_uzp = df_winter[min_i_uzp:]  
     
     df_stat['frozen_days_uzp'] = [len(df_uzp[df_uzp['mean_temp']<0])]
     df_stat['frozen_days_1.01'] = [len(df_winter[df_winter['mean_temp']<0][str(df_winter.index.year[-1]) + '-01-01' : max_i])]
     df_stat['frozen_days_15.01'] = [len(df_winter[df_winter['mean_temp']<0][str(df_winter.index.year[-1]) + '-01-15' : max_i])]
     df_stat['frozen_days_1.02'] = [len(df_winter[df_winter['mean_temp']<0][str(df_winter.index.year[-1]) + '-02-01' : max_i])]
     
-    #################################### подготовка оттепели
-    
-    ####### оттепели
     df_winter_1 = df_winter[df_winter['mean_temp'] < 0]
     
     df_ind = pd.DataFrame()
     df_ind['mean_temp'] = df_winter_1.index
     
-    aaa = pd.DataFrame()    # датафрейм со сдвинутыми датами
+    aaa = pd.DataFrame()    
     aaa['mean_temp_sh'] = df_winter_1['mean_temp'].shift(1).dropna().index
     
-    df_ind = pd.concat([df_ind, aaa], axis = 1) # соединяем
+    df_ind = pd.concat([df_ind, aaa], axis = 1) 
     
     df_ind['dif'] = df_ind['mean_temp_sh'] - df_ind['mean_temp']
     df_ind['dif'] = df_ind['dif'].dt.days - 1
     df_ind = df_ind[df_ind['dif'] > 0]
-    # добавил рассчет средней температуры за оттепель и суммы осадков за оттепель
+
     df_ind['thaw_temp_mean_per_thaw'] = [df_cut[df_ind['mean_temp'].iloc[i]:df_ind['mean_temp_sh'].iloc[i]]['mean_temp'].values[1:-1].mean() for i in range(len(df_ind))]
     df_ind['ThawTP_sum_per_thaw'] = [df_cut[df_ind['mean_temp'].iloc[i]:df_ind['mean_temp_sh'].iloc[i]]['prec'].values[1:-1].sum() for i in range(len(df_ind))]
     
-    #######
-    
-    ################################### Thaw part
+
     df_stat['thaw_count'] = [len(df_ind)]                
     df_stat['thaw_days'] = [len(df_winter[df_winter['mean_temp'] > 0]['mean_temp'])]
     
     df_stat['thaw_mean_len'] = df_stat['thaw_days'] / df_stat['thaw_count']
     df_stat['thaw_max_len'] = [df_ind['dif'].max()] 
     
-    df_stat['thaw_temp_mean_per_thaw'] = df_ind['thaw_temp_mean_per_thaw'].mean()       # добавил
-    df_stat['ThawTP_sum_per_thaw'] = df_ind['ThawTP_sum_per_thaw'].mean()             # добавил
-    '''
-    try:
-        df_stat['thaw_max_len'] = [df_ind['dif'].max()] 
-    except:
-        df_stat['thaw_max_len'] = [np.nan] 
-    '''
-    ################################### Cv part
+    df_stat['thaw_temp_mean_per_thaw'] = df_ind['thaw_temp_mean_per_thaw'].mean()       
+    df_stat['ThawTP_sum_per_thaw'] = df_ind['ThawTP_sum_per_thaw'].mean()             
+
     if  len(df_winter) != 0:
     
         df_stat['thaw_days_Cv'] = [df_ind['dif'].std() / df_ind['dif'].mean()]
@@ -127,51 +110,17 @@ def temp_prec_stat(df_cut):
         df_stat['SnowTP_Cv'] = [np.nan]
         df_stat['ThawTP_Cv'] = [np.nan]
         
-    ################################### TP part
     
     df_stat['SnowTP'] = [df_winter[df_winter['mean_temp'] < 0]['prec'].sum()]
     df_stat['ThawTP'] = [df_winter[df_winter['mean_temp'] > 0]['prec'].sum()]
-    
-     ################################### last days stat
     
     df_stat = last_day_stats(df_cut, 0, 10, 'sp_10d')
     df_stat = last_day_stats(df_cut, 10, 10, 'bf_10d')
     df_stat = last_day_stats(df_cut, 10, 0, 'last_10d')
     
-    ################################### TP spec     необходимо иметь данные о дате схода снежного покрова
-    '''
-    year_cut = year_dt.year[0] - 1
-    df_tp = df_cut[str(year_cut) + '-11-01' : df_cut['data_shod'].values[0]]
-    
-    if len(df_tp) != 0:
-        df_stat['TPsum_01.11-SP'] = [df_cut[str(year_cut) + '-11-01' : df_cut['data_shod'].values[0]]['prec'].sum()]
-        df_stat['TPsum_01.02-SP10'] = [df_cut[str(year_cut+1) + '-02-01' : df_cut['data_shod'].values[0] + pd.to_timedelta('10 days')]['prec'].sum()]
-        df_stat['TPsum_10.02-SP10'] = [df_cut[str(year_cut+1) + '-02-10' : df_cut['data_shod'].values[0] + pd.to_timedelta('10 days')]['prec'].sum()]
-        df_stat['TPsum_20.02-SP10'] = [df_cut[str(year_cut+1) + '-02-20' : df_cut['data_shod'].values[0] + pd.to_timedelta('10 days')]['prec'].sum()]
-    
-    else:
-        df_stat['TPsum_01.11-SP'] = [np.nan]
-        df_stat['TPsum_01.02-SP10'] = [np.nan]
-        df_stat['TPsum_10.02-SP10'] = [np.nan]
-        df_stat['TPsum_20.02-SP10'] = [np.nan]
-    '''
-    
-    '''
-    # снегозапас    
-    df_sd = df_cut[str(year_cut+1) + '-01-05' : str(year_cut+1) + '-03-31']
-   
-    df_stat['Smax_05-31.01'] = df_cut[: str(year_cut+1) + '-01-31']['snowdepth'].max()
-    df_stat['Smax_05-28.02'] = df_cut[str(year_cut+1) + '-02-05' : str(year_cut+1) + '-02-28']['snowdepth'].max()
-    df_stat['Smax_31.01-15.02'] = df_cut[str(year_cut+1) + '-01-31' : str(year_cut+1) + '-02-15']['snowdepth'].max()
-    df_stat['Smax_31.01-28.02'] = df_cut[str(year_cut+1) + '-01-31' : str(year_cut+1) + '-02-28']['snowdepth'].max()
-    df_stat['Smax_05.01-31.03'] = df_sd['snowdepth'].max()
-
-    '''    
-    
-    #обнуление если пропуски
     len_ex = len(df_cut[df_cut.index.month.isin([11,12,1,2,3])]['mean_temp'].dropna())
         
-    if len_ex/151 < 0.9:            # 151 - это количество дней в 11,12,1,2,3 месяцах
+    if len_ex/151 < 0.9:            
         df_stat = df_stat * np.nan
         
     return df_stat
@@ -184,7 +133,7 @@ def sd_stat_groupby(df_pre):
 # =============================================================================
     df_new = df_pre.copy()
     df_new['year'] = df_new.index.year
-    df_new.loc[df_new.index.month >= 8, 'year'] += 1            # зима 1979-1980 записывается как 1980
+    df_new.loc[df_new.index.month >= 8, 'year'] += 1            
      
     df_gr = df_new.groupby(df_new['year']).apply(temp_prec_stat)
                
@@ -204,13 +153,13 @@ if __name__ == '__main__':
 # =============================================================================
 
     
-    path1 = 'I:/RNF/data_ready_to_use/ERA5/2m_temperature/'                    # !!!
+    path1 = 'I:/RNF/data_ready_to_use/ERA5/2m_temperature/'                    
     path2 = 'I:/RNF/data_ready_to_use/ERA5/total_precipitation/'
     
-    input_file1 = '2m_temperature_full.nc'                         # !!!
-    input_file2 = 'total_precipitation_full.nc'                    # !!!
+    input_file1 = '2m_temperature_full.nc'                         
+    input_file2 = 'total_precipitation_full.nc'                    
     
-    save_path = 'Temp_Prec_full.nc'                                        # !!!
+    save_path = 'Temp_Prec_full.nc'                                        
     
     nc_temp = xr.open_dataset(path1 + input_file1)        
     nc_temp = nc_temp['t2m'] - 273.15 

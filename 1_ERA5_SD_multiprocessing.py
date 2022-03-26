@@ -30,7 +30,6 @@ def sd_stat(df_cut):
 #     Функция для расчета характеристик снежного покрова
 #     
 # =============================================================================
-    #df_cut = df_new[df_new['year'] == 2000]
     
     df_cut = df_cut.drop(['year'], axis = 1)
     df_stat = pd.DataFrame()
@@ -46,14 +45,10 @@ def sd_stat(df_cut):
         df_stat['len_snow_period'] = [0]
         df_stat['len_snowbreak'] = [np.nan]
         
-    # =========================================================================
-    #   оттепели
-    # =========================================================================
-    # подготовка данных
     df_ind = pd.DataFrame()
     df_ind['snowdepth'] = df_snow.index
     
-    aaa = pd.DataFrame()    # датафрейм со сдвинутыми датами
+    aaa = pd.DataFrame()    
     aaa['snowdepth_sh'] = df_snow['sd'].shift(1).dropna().index
     
     df_ind = pd.concat([df_ind, aaa], axis = 1) 
@@ -61,12 +56,12 @@ def sd_stat(df_cut):
     df_ind['dif'] = df_ind['snowdepth_sh'] - df_ind['snowdepth']
     df_ind['dif'] = df_ind['dif'].dt.days - 1
     df_ind = df_ind[df_ind['dif'] > 0]
-    ###############################################################################
+    
     
     df_stat['snowbreak_count'] = len(df_ind)
     df_stat['snowbreak_max_len'] = df_ind['dif'].max()
     df_stat['snowbreak_mean_len'] = df_ind['dif'].mean()
-    df_stat['len_snowbreak'] = df_ind['dif'].sum()         # повторение
+    df_stat['len_snowbreak'] = df_ind['dif'].sum()         
     
     if len(df_ind) == 0:
         df_stat['snowbreak_max_len'] = [0]
@@ -99,7 +94,7 @@ def sd_stat_groupby(df_pre):
 # =============================================================================
     df_new = df_pre.copy()
     df_new['year'] = df_new.index.year
-    df_new.loc[df_new.index.month >= 8, 'year'] += 1    # зима 1979-1980 записывается как 1980
+    df_new.loc[df_new.index.month >= 8, 'year'] += 1    
      
     df_gr = df_new.groupby(df_new['year']).apply(sd_stat)
                
@@ -120,13 +115,12 @@ if __name__ == '__main__':
 #     Необходимо задать исходный файл с параметром snow_depth и место сохранения результата
 # =============================================================================
     path = 'input/'
-    input_file = 'snow_depth_full.nc'                               # !!!
+    input_file = 'snow_depth_full.nc'                               
     
-    save_path = 'output/SD_features.nc'                                        # !!!
+    save_path = 'output/SD_features.nc'                                        
     
     nc_sd = xr.open_dataset(path + input_file)        
     nc_sd = nc_sd['sd'] * 1000
-    #nc_sd = nc_sd.sel(latitude = slice(70, 43), longitude = slice(20, 60))
     
     nc_sd.values = xr.where(nc_sd.values > 0.05, nc_sd.values,  0.0)
     
@@ -142,6 +136,6 @@ if __name__ == '__main__':
     df_full = pd.concat(result)       
     
     xxx = df_full.to_xarray()
-    xxx.to_netcdf(save_path)         # !!!
+    xxx.to_netcdf(save_path)         
        
 
